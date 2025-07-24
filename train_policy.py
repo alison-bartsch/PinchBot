@@ -29,7 +29,7 @@ def train_diffusion_policy(ckpt_dir, training_params):
 
         elif training_params['embedding'] == 'pointnet':
             encoder = PointNetEncoderXYZ().to(device)
-            checkpoint_path = "/home/alison/Documents/GitHub/SculptDiff/pointnet/weights/best_model_epoch_181.pth"
+            checkpoint_path = "path/to/PinchBot/checkpoints/pointnet/weights/best_model_epoch_181.pth"
             state_dict = torch.load(checkpoint_path, map_location=device)
             # Load only the encoder weights
             encoder.load_state_dict({k.replace('encoder.', ''): v for k, v in state_dict.items() if k.startswith('encoder.')})
@@ -68,7 +68,7 @@ def train_diffusion_policy(ckpt_dir, training_params):
     pred_horizon = 16 
     num_epochs = 1500 
     target_shape = "pottery" 
-    dataset_path = '/home/alison/Documents/June18_Human_Demos_Train'
+    dataset_path = '/path/to/dataset/June18_Human_Demos_Train'
     center_actions = False
     discount_factor = 0.9 # if 1.0 then no discounting
     subgoal_stepsize = 8
