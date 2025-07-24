@@ -12,7 +12,6 @@ import pyrealsense2 as rs
 import robomail.vision as vis
 from frankapy import FrankaArm
 from pcl_utils import *
-from test_collision_checker import check_finger_collision
 from pointBERT.tools import builder
 from pointBERT.utils.config import cfg_from_yaml_file
 from scipy.spatial.transform import Rotation
@@ -41,10 +40,6 @@ def get_constrained_action(unnorm_a, pointcloud):
     miny = pcl_mins[1]
     maxy = pcl_maxs[1]
 
-    # NOTE: if this is not a reliable way to find good radius constraint (i.e. too much noise)
-    # then instead project all points into x,y plane and do a few optimization steps to find
-    # best circle fit to minimize radius, but fit most ~95% of points inside
-
     # get the mean radius constraint
     r = (np.mean([maxx-minx, maxy-miny]) / 2.0) - 0.007
 
@@ -70,75 +65,6 @@ def get_constrained_action(unnorm_a, pointcloud):
     print("\nPrevious Action: ", unnorm_a)
     print("New Constrained Action: ", a_new)
     return a_new
-
-
-# def get_constrained_action(unnorm_a, pointcloud):
-#     '''
-#     Constrain the unnorm_a x,y components to the elliptical
-#     constraint given the measured diameters along x and y
-#     of the point cloud.
-#     '''
-#     pcl_center = np.array([0.630, -0.0054, 0.074])
-#     ee_center = np.array([0.608, 0.014, 0.125])
-
-#     # get the min and max x and y components of the pointcloud
-#     pcl_copy = copy.deepcopy(pointcloud)
-#     pcl_copy = pcl_copy / 10.0
-#     pcl_copy = pcl_copy - pcl_center
-#     pcl_mins = np.min(pcl_copy, axis=0) 
-#     pcl_maxs = np.max(pcl_copy, axis=0) 
-#     minx = pcl_mins[0]
-#     maxx = pcl_maxs[0] 
-#     miny = pcl_mins[1]
-#     maxy = pcl_maxs[1]
-
-#     ellipse_a = ((maxx - minx) / 2.0) - 0.007
-#     ellipse_b = ((maxy - miny) / 2.0) - 0.007
-
-#     # center the unnorm_a x and y components
-#     x = unnorm_a[0] - ee_center[0]
-#     y = unnorm_a[1] - ee_center[1]
-#     print("\nOld x,y: ", x, y)
-#     print("R: ", ellipse_a, ellipse_b)
-
-#     def f(lam):
-#         return (
-#             (ellipse_a**2 * x)**2 / (ellipse_a**2 + lam)**3 +
-#             (ellipse_b**2 + y)**2 / (ellipse_b**2 + lam)**3 -
-#             (ellipse_a**2 + x**2 + ellipse_b**2 + y**2) / (ellipse_a**2 + lam)**2 / (ellipse_b**2 + lam)**2
-#         )
-    
-#     lam_low = 0
-#     lam_high = max(ellipse_a**2, ellipse_b**2) + np.linalg.norm([x,y])**2
-#     sol = root_scalar(f, bracket=[lam_low, lam_high], method='bisect', xtol=1e-9)
-
-#     if not sol.converged:
-#         raise RuntimeError("Projection to ellipse failed to converge")
-    
-#     lam_star = sol.root
-
-#     # # check if already follows constraint
-#     # norm_sq = (x**2) / (ellipse_a**2) + (y**2) / (ellipse_b**2)
-#     # if norm_sq >= 1:
-#     #     return unnorm_a
-
-#     # scale = np.sqrt(1 / norm_sq)
-#     # x_new = x * scale
-#     # y_new = y * scale
-
-
-#     x_new = (ellipse_a**2 * x) / (ellipse_a**2 + lam_star)
-#     y_new = (ellipse_b**2 * y) / (ellipse_b**2 + lam_star)
-#     print("New x,y : ", x_new, y_new)
-
-#     a_new = unnorm_a.copy()
-#     a_new[0] = x_new + ee_center[0]
-#     a_new[1] = y_new + ee_center[1]
-#     print("\nPrevious Action: ", unnorm_a)
-#     print("New Constrained Action: ", a_new)
-#     return a_new
-
-
 
 
 def calculate_intermediate_pose(final_pose, dist=0.055):
@@ -215,18 +141,6 @@ def goto_grasp(fa, x, y, z, rx, ry, rz, d):
     pose.translation = np.array([x, y, z])
 
     intermediate_pose = calculate_intermediate_pose(pose.copy())
-
-    # # pre-rotating the base to speed up goto pose for extreme rotations (base joint is a bit sticky)
-    # if (rz < -100) or (rz > 200):
-    #     cur_joints = fa.get_joints()
-    #     cur_joints[0] = 0.3
-    #     fa.goto_joints(cur_joints, duration=7)
-    # elif (rz < -45) and (rz > -100):
-    #     cur_joints = fa.get_joints()
-    #     cur_joints[0] = -0.3
-    #     fa.goto_joints(cur_joints, duration=7)
-
-    # fa.goto_pose(intermediate_pose, duration=15) # NOTE: used to be duration=6
 
     fa.goto_pose(intermediate_pose, duration=inpos_duration) # NOTE: used to be duration=6
 
@@ -321,21 +235,6 @@ def experiment_loop(fa, cam1, cam2, cam3, cam4, cam5, pcl_vis, save_path, goal_s
         a_mins7d = np.array([-0.15, -0.15, -0.05, -90, 0.005])
         a_maxs7d = np.array([0.15, 0.15, 0.05, 90, 0.05])
     else:
-        # # ----------- for symmetrical 7 demo dataset -----------
-        # a_mins7d = np.array([0.5413, -0.04232, 0.1300, -45, -15, -90, 0.0005])
-        # a_maxs7d = np.array([0.6700, 0.08500, 0.1560, 45, 13, 90, 0.005])
-
-        # # ------- min/max values for 20 concave/convex demos from \June18_Human_Demos -----
-        # a_mins7d = np.array([0.5340, -0.0549, 0.1272, -360, -10.10, -180, 0.008])
-        # a_maxs7d = np.array([0.6749, 0.0871, 0.1600, 360, 11.68, 180, 0.016])
-        # a_mins7d = np.array([0.5340, -0.0549, 0.1272, -360, -11.68, -180, 0.008])
-        # a_maxs7d = np.array([0.6749, 0.0871, 0.1600, 360, 10.10, 180, 0.016])
-        # a_mins7d = np.array([0.2188, -0.1150, 0.1272, -360, -50, -120, 0.008])
-        # a_maxs7d = np.array([0.7376, 0.1007, 0.1600, 360, 50, 240, 0.016])
-
-        # a_mins7d = np.array([0.52776, -0.0662, 0.1272, -360, -10.10, -120, 0.008])
-        # a_maxs7d = np.array([0.68825, 0.09425, 0.1600, 360, 11.68, 240, 0.016])
-
         a_mins7d = np.load(ckpt_dir + '/action_mins.npy')
         a_maxs7d = np.load(ckpt_dir + '/action_maxs.npy')
 
@@ -391,8 +290,6 @@ def experiment_loop(fa, cam1, cam2, cam3, cam4, cam5, pcl_vis, save_path, goal_s
     rgb4, _, pc4, _ = cam4._get_next_frame()
     rgb5, _, pc5, _ = cam5._get_next_frame()
 
-    # unnorm_pcl, ctr = pcl_vis.unnormalize_fuse_point_clouds_no_base(pc2, pc3, pc4, pc5, color="Orange")
-
     # for 5x cameras, we need to get the ee pose
     cur_pose = fa.get_pose()
     translation = cur_pose.translation
@@ -411,7 +308,6 @@ def experiment_loop(fa, cam1, cam2, cam3, cam4, cam5, pcl_vis, save_path, goal_s
     o3d.io.write_point_cloud(save_path + '/cam5_pcl0.ply', pc5)
 
     # center the goal based on the goal center
-    # numpy_goal = (np.copy(raw_goal) - ctr) * 10.0
     numpy_goal = (np.copy(raw_goal) - global_pcl_center) * 10
     # scale distance metric goal differently 
     dist_goal = np.copy(numpy_goal)
@@ -479,26 +375,6 @@ def experiment_loop(fa, cam1, cam2, cam3, cam4, cam5, pcl_vis, save_path, goal_s
 
             if iter > 2 and constraint_projection:
                 unnorm_a = get_constrained_action(unnorm_a, pointcloud)
-
-            # check for collision with the point cloud if the initial piercing actions have been executed
-            if iter > 6 and collision_check:
-                collision = check_finger_collision(unnorm_a, pcl, vis=False)
-                n_checks = 0
-                while collision and n_checks < 10:
-                    n_checks += 1
-                    print("\nCollision detected, replanning...")
-                    naction, total_time = sculptdiff_generate_actions(pointbert, projection_head, noise_scheduler, noise_pred_net, og_pointcloud, numpy_goal, og_nagent_pos, obs_horizon, action_dim, num_diffusion_iters, device)
-                    pred_action = naction[0]
-                    termination_pred = pred_action[:,7]
-                    action_pred = (pred_action[:,0:7] + 1.0) / 2.0
-                    action_pred = action_pred * (a_maxs7d - a_mins7d) + a_mins7d
-                    unnorm_a = action_pred[j,:]
-                    print("unnorm a new: ", unnorm_a)
-                    terminate = termination_pred[j]
-                    collision = check_finger_collision(unnorm_a, pcl, vis=False)
-
-            if centered_action:
-                unnorm_a[0:3] = unnorm_a[0:3] + ctr
 
             # update nagent_pos to be the new position
             nagent_pos = torch.from_numpy(pred_action[j]).to(torch.float32).unsqueeze(axis=0).unsqueeze(axis=0).to(device)
@@ -581,7 +457,6 @@ def experiment_loop(fa, cam1, cam2, cam3, cam4, cam5, pcl_vis, save_path, goal_s
             o3d.io.write_point_cloud(save_path + '/cam5_pcl' + str(iter) + '.ply', pc5)
 
             # center the goal based on the point cloud center
-            # numpy_goal = (np.copy(raw_goal) - ctr) * 10.0
             numpy_goal = (np.copy(raw_goal) - global_pcl_center) * 10.0
             # scale distance metric goal differently 
             dist_goal = np.copy(numpy_goal)
@@ -670,18 +545,10 @@ if __name__ == '__main__':
     # -------------------------------------------------------------------
     # ---------------- Experimental Parameters to Define ----------------
     # -------------------------------------------------------------------
-    # * straight wall train: Trajectory6/unnormalized_pointcloud29.npy [8 cm] <--- worked with 8 execute horizon, fails with 4
-    # alternative straight wall train: Trajectory1/unnormalized_pointcloud31.npy
-    # other alternative straight wall train: Trajectory5/unnormalized_pointcloud24.npy [7 cm]
-    # * slanted wall train: Trajectory3/unnormalized_pointcloud28.npy [10 cm]
-    # alternative slanted wall train: Trajectory8/unnormalized_pointcloud24.npy [11 cm]
-    # * more slanted wall train: Trajectory9/unnormalized_pointcloud22.npy [12 cm]
-    # straight wall test: Trajectory4/unnormalized_pointcloud19.npy [8 cm]
-    # slanted wall test: Trajectory2/unnormalized_pointcloud22.npy [10 cm]
     exp_num = 1
     goal_shape = 'pottery' 
-    model_path = '/home/alison/Documents/GitHub/SculptDiff/checkpoints/pointbert_pretrained_continual_guidance' # new_data_16_pred_june30_updated_augs'
-    goal_path = '/home/alison/Clay_Data/June18_Human_Demos/pottery/Train/Trajectory9/unnormalized_pointcloud22.npy' # Test/Trajectory0/unnormalized_pointcloud23.npy'  # '/home/alison/Clay_Data/June18_Human_Demos/pottery/Test/Trajectory1/unnormalized_pointcloud22.npy' # Trajectory2/unnormalized_pointcloud33.npy'
+    model_path = '/home/alison/Documents/GitHub/SculptDiff/checkpoints/pointbert_pretrained_continual_guidance' 
+    goal_path = '/path/to/test/goal'
     centered_action = False
     pred_horizon = 16 
     execute_horizon = 8

@@ -12,7 +12,6 @@ import pyrealsense2 as rs
 import robomail.vision as vis
 from frankapy import FrankaArm
 from pcl_utils import *
-from test_collision_checker import check_finger_collision
 from scipy.spatial.transform import Rotation
 from scipy.optimize import root_scalar
 from diffusers.schedulers.scheduling_ddpm import DDPMScheduler
@@ -38,10 +37,6 @@ def get_constrained_action(unnorm_a, pointcloud):
     maxx = pcl_maxs[0] 
     miny = pcl_mins[1]
     maxy = pcl_maxs[1]
-
-    # NOTE: if this is not a reliable way to find good radius constraint (i.e. too much noise)
-    # then instead project all points into x,y plane and do a few optimization steps to find
-    # best circle fit to minimize radius, but fit most ~95% of points inside
 
     # get the mean radius constraint
     r = (np.mean([maxx-minx, maxy-miny]) / 2.0) - 0.007
@@ -298,7 +293,6 @@ def experiment_loop(fa, cam1, cam2, cam3, cam4, cam5, pcl_vis, save_path, goal_s
     _, _, _, _, _, unnorm_pcl, ctr = pcl_vis.crop_point_clouds_separately(pc1, pc2, pc3, pc4, pc5, color="Orange", ee_pos=translation, ee_rot=rotation, icp=True)
                 
     # center and scale pointcloud
-    # pointcloud = (np.copy(unnorm_pcl) - ctr) * 10
     pointcloud = (np.copy(unnorm_pcl) - global_pcl_center) * 10
 
     # save the point clouds from each camera
@@ -377,26 +371,6 @@ def experiment_loop(fa, cam1, cam2, cam3, cam4, cam5, pcl_vis, save_path, goal_s
 
             if iter > 2 and constraint_projection:
                 unnorm_a = get_constrained_action(unnorm_a, pointcloud)
-
-            # check for collision with the point cloud if the initial piercing actions have been executed
-            if iter > 6 and collision_check:
-                collision = check_finger_collision(unnorm_a, pcl, vis=False)
-                n_checks = 0
-                while collision and n_checks < 10:
-                    n_checks += 1
-                    print("\nCollision detected, replanning...")
-                    naction, total_time = sculptdiff_generate_actions(pointnet_encoder, projection_head, noise_scheduler, noise_pred_net, og_pointcloud, numpy_goal, og_nagent_pos, obs_horizon, action_dim, num_diffusion_iters, device)
-                    pred_action = naction[0]
-                    termination_pred = pred_action[:,7]
-                    action_pred = (pred_action[:,0:7] + 1.0) / 2.0
-                    action_pred = action_pred * (a_maxs7d - a_mins7d) + a_mins7d
-                    unnorm_a = action_pred[j,:]
-                    print("unnorm a new: ", unnorm_a)
-                    terminate = termination_pred[j]
-                    collision = check_finger_collision(unnorm_a, pcl, vis=False)
-
-            if centered_action:
-                unnorm_a[0:3] = unnorm_a[0:3] + ctr
 
             # update nagent_pos to be the new position
             nagent_pos = torch.from_numpy(pred_action[j]).to(torch.float32).unsqueeze(axis=0).unsqueeze(axis=0).to(device)
@@ -568,18 +542,10 @@ if __name__ == '__main__':
     # -------------------------------------------------------------------
     # ---------------- Experimental Parameters to Define ----------------
     # -------------------------------------------------------------------
-    # * straight wall train: Trajectory6/unnormalized_pointcloud29.npy [8 cm] <--- worked with 8 execute horizon, fails with 4
-    # alternative straight wall train: Trajectory1/unnormalized_pointcloud31.npy
-    # other alternative straight wall train: Trajectory5/unnormalized_pointcloud24.npy [7 cm]
-    # * slanted wall train: Trajectory3/unnormalized_pointcloud28.npy [10 cm]
-    # alternative slanted wall train: Trajectory8/unnormalized_pointcloud24.npy [11 cm]
-    # * more slanted wall train: Trajectory9/unnormalized_pointcloud22.npy [12 cm]
-    # straight wall test: Trajectory4/unnormalized_pointcloud19.npy [8 cm]
-    # slanted wall test: Trajectory2/unnormalized_pointcloud22.npy [10 cm]
     exp_num = 1
     goal_shape = 'pottery' 
-    model_path = '/home/alison/Documents/GitHub/SculptDiff/checkpoints/pointnet_pretrained_forward' # new_data_16_pred_june30_updated_augs'
-    goal_path = '/home/alison/Clay_Data/June18_Human_Demos/pottery/Train/Trajectory3/unnormalized_pointcloud28.npy' # Test/Trajectory0/unnormalized_pointcloud23.npy'  # '/home/alison/Clay_Data/June18_Human_Demos/pottery/Test/Trajectory1/unnormalized_pointcloud22.npy' # Trajectory2/unnormalized_pointcloud33.npy'
+    model_path = '/home/alison/Documents/GitHub/SculptDiff/checkpoints/pointnet_pretrained_forward' 
+    goal_path = '/path/to/test/goal'
     centered_action = False
     pred_horizon = 16 
     execute_horizon = 8
