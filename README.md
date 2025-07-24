@@ -14,10 +14,3 @@ To train a point cloud-based sculpting policy, run train_policy.py. Update relev
 
 ## Replicate Harware Setup
 Follow the link to the [Hardware CAD](https://drive.google.com/file/d/1JbbHU8lW7LBvTGYZ2qOLVUAGpOO5gcLK/view?usp=drive_link) to replicate our camera cage.
-
-## Cite this Work
-@article{bartsch2025pinchbot,
-  title={PinchBot: Long-Horizon Deformable Manipulation with Guided Diffusion Policy},
-  author={Bartsch, Alison and Car, Arvind and Farimani, Amir Barati},
-  journal={INSERT},
-  year={2025}}
