@@ -12,8 +12,8 @@ Follow the installation instructions and download the model weights of [Point-BE
 ## Download Pre-Trained Weights
 [[PointBERT]](https://drive.google.com/file/d/1fXddMQeGXlwjGp1XovOVBHHg_YXQ6Ykp/view?usp=drive_link) [[PointNet]](https://drive.google.com/file/d/18KvRYvyW8VXBQ-MGcCU4teah-PGDboje/view?usp=drive_link)
 
-Save PointBERT weights under '/pointBERT/point-BERT-weights/'
-Save PointNet weights under '/pointnet/weights/'
+* Save PointBERT weights under '/pointBERT/point-BERT-weights/'
+* Save PointNet weights under '/pointnet/weights/'
 
 ## Train Policies
 To train a point cloud-based sculpting policy, run train_policy.py. Update relevant parameters for choice of point cloud embedding and guidance scenarios. 
