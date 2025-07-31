@@ -19,4 +19,4 @@ Follow the installation instructions and download the model weights of [Point-BE
 To train a point cloud-based sculpting policy, run train_policy.py. Update relevant parameters for choice of point cloud embedding and guidance scenarios. 
 
 ## Replicate Harware Setup
-Follow the link to the [Hardware CAD](https://drive.google.com/file/d/1JbbHU8lW7LBvTGYZ2qOLVUAGpOO5gcLK/view?usp=drive_link) to replicate our camera cage.
+Follow the link to the [Hardware CAD](https://drive.google.com/drive/folders/1K9mjWhLs-PY7wCxvqscFRviYyx-8EYnJ?usp=sharing) to replicate our camera cage.
